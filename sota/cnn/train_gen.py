@@ -58,8 +58,8 @@ parser.add_argument('--search_space', type=str, default='s5', help='searching sp
 parser.add_argument('--resume_epoch', type=int, default=0, help="load ckpt, start training at resume_epoch")
 parser.add_argument('--ckpt_interval', type=int, default=50, help="interval (epoch) for saving checkpoints")
 parser.add_argument('--resume_expid', type=str, default='', help="full expid to resume from, name == ckpt folder name")
-parser.add_argument('--fast', action='store_true', default=False, help="fast mode for debugging")
-parser.add_argument('--queue', action='store_true', default=False, help="queueing for gpu")
+parser.add_argument('--fast', action='store_true', help="fast mode for debugging")
+parser.add_argument('--queue', action='store_true', help="queueing for gpu")
 
 parser.add_argument('--from_dir', action='store_true', help="arch load form dir")
 args = parser.parse_args()
@@ -74,7 +74,6 @@ Genotype = namedtuple('Genotype', 'normal normal_concat reduce reduce_concat')
 #### args augment
 expid = args.save
 
-# print(args.from_dir)
 if args.from_dir:
     id_name = os.path.split(args.arch)[1]
     args.arch = load_network_pool(args.arch)
@@ -173,19 +172,11 @@ def main():
     if args.model_name:
         from searched_models import model_dict
         best_model = model_dict[args.model_name]
-        model = GenNetwork(best_model, args.init_channels, n_classes, args.layers, args.auxiliary, steps=4,
-                           concat=range(2, 6), data=torch.randn(size=(1, 3, 32, 32)),
-                           primitives=spaces_dict[args.search_space], drop_path_prob=args.drop_path_prob,
-                           )
-        model.cuda()
-        print(model.get_arch())
+
     else:
         x = next(iter(train_queue))[0][0].unsqueeze(0)
-
-        # x = torch.randn(size=(1, 3, 32, 32))
         s = time.time()
         models_pool = []
-        # for _ in tqdm(random.sample(range(100000), args.pool)):
         for _ in tqdm(range(args.pool)):
             arch = None
             model = GenNetwork(arch, args.init_channels, n_classes, args.layers, args.auxiliary, steps=args.steps,
@@ -195,37 +186,19 @@ def main():
             models_pool.append((model, model.get_net_score()))
         e = time.time()
         logging.info('total time: %f', e - s)
-        #
-        # seed_torch(args.seed)
+
         models_id = sorted(range(len(models_pool)), key=lambda k: models_pool[k][1], reverse=True)
         model, idx = models_pool[models_id[0]][0], models_id[0]
         print(model.get_arch())
-        print('best model score: ', model.get_net_score(), 'idx: ', idx)
-        model.cuda()
-        scores = [_[1] for _ in models_pool]
-        # print(scores)
-        scores = np.asarray(scores)
-        print(scores)
-        logging.info('mean score: %f, score std: %f, max score: %f, min score: %f', np.mean(scores), np.std(scores),
-                     np.max(scores), np.min(scores))
-        exit()
-        # with open('ablation.txt', 'a') as f:
-        #     f.write(f'{args.batch_size},{np.mean(scores)},{np.std(scores)},{np.max(scores)},{np.min(scores)}\n')
-        # with open('ablation_org_data.txt', 'a') as f:
-        #     for score in scores:
-        #         f.write(f'{score},')
-        #     f.write('\n')
+        best_model=model.get_arch()
 
-
-    model = GenNetwork(model.get_arch(), args.init_channels, n_classes, args.layers, args.auxiliary, steps=4,
+    model = GenNetwork(best_model, args.init_channels, n_classes, args.layers, args.auxiliary, steps=4,
                            concat=range(2, 6), data=torch.randn(size=(1, 3, 32, 32)),
                            primitives=spaces_dict[args.search_space], drop_path_prob=args.drop_path_prob,
                            )
     logging.info("param size = %fMB", ig_utils.count_parameters_in_MB(model))
     model = model.cuda()
-    # model = nn.DataParallel(model)
-
-    # model = torch.compile(model)
+    model = nn.DataParallel(model)
 
 
     criterion = nn.CrossEntropyLoss()
