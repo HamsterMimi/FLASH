@@ -168,20 +168,7 @@ def main():
     cudnn.enabled = True
 
 
-    # logging.info('gpu device = %d' % gpu)
     logging.info("args = %s", args)
-
-    # if args.from_dir:
-    #     genotype_config = json.loads(args.arch)
-    #     genotype = Genotype(normal=genotype_config['normal'], normal_concat=genotype_config['normal_concat'],
-    #                         reduce=genotype_config['reduce'], reduce_concat=genotype_config['reduce_concat'])
-    # else:
-    #     genotype = eval("genotypes.%s" % args.arch)
-
-    # model = GenDartsNetworkProj(args.init_channels, n_classes, args.layers, criterion=nn.CrossEntropyLoss().cuda(), primitives=spaces_dict[args.search_space],
-    #                              args=args, data=torch.randn(size=(1, 3, 32, 32)))
-
-    # x = torch.randn(size=(1, 3, 32, 32))
 
     if args.model_name:
         from searched_models import model_dict

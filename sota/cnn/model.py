@@ -77,7 +77,6 @@ class GenCell(nn.Module):
         self.preprocess1 = ReLUConvBN(C_prev, C, 1, 1, 0)
 
         if arch:
-            # print(arch)
             op_names, indices = zip(*arch)
             self.arch = arch
             self._compile(C, op_names, indices, concat, reduction)
@@ -85,8 +84,6 @@ class GenCell(nn.Module):
             if (data1 is None) or (data2 is None) or (primitives is None) or (concat is None) or (steps is None):
                 raise ValueError('Data or Primitives or concat or steps is None')
             else:
-                # self.topology = [[(0, 1), (0, 1), (2, 3), (1, 3)], [(0, 1), (0, 1), (0, 2), (1, 2)]]
-                # self.topology = [[(0, 1), (1, 2), (2, 3), (3, 4)], [(0, 1), (1, 2), (2, 3), (3, 4)]]
                 self.topology = None
                 self._concat = concat
                 self._gen_network(C, data1, data2, steps)
@@ -125,18 +122,11 @@ class GenCell(nn.Module):
                 if len(set(prev_node_id)) == len(prev_node_id):
                     opnames = [ops[k][2] for k in ops_id]
                     c = sum([_ in no_param_ops for _ in opnames])
-                    # if self.reduction:
-                    #     t = self.topology[1][i]
-                    # else:
-                    #     t = self.topology[0][i]
-                    # if (c < 2 and count + c < 3) and (t[0] in prev_node_id) and (t[1] in prev_node_id):
                     if (c < 2 and count + c < 3):
                         ops = [ops[_] for _ in ops_id]
                         edges_in = [maps[_] for _ in ops_id]
                         self.cell_score += sum(comb_scores[id])
-                        # print(self.cell_score)
                         count += c
-                        # print([(_[2],_[1]) for _ in ops], count)
                         break
                     else:
                         continue
@@ -146,14 +136,11 @@ class GenCell(nn.Module):
             self._ops += ops
             edge_index += 1
             states.append(out)
-            # print(node_edge_in)
             _, self._indices, self._ops_name = zip(*self._ops)
-            # print(self._ops_name, self._indices)
 
         self._ops, self._indices, self._ops_name = zip(*self._ops)
         self._ops = nn.ModuleList(self._ops)
-        # print(self._ops_name, self._indices)
-        # input('随便输入点啥，就搜索下一个cell')
+
 
     def score(self, x):
         x = x[0]
@@ -162,13 +149,11 @@ class GenCell(nn.Module):
         temp = []
         for i in range(int(out_channels/8)):
             idxs = random.sample(range(out_channels), 8)
-            # print(idxs)
             corr = torch.corrcoef(fea[idxs, :])
             corr[torch.isnan(corr)] = 0
             corr[torch.isinf(corr)] = 0
             values = torch.linalg.eig(corr)[0]
             temp.append(torch.min(torch.real(values)))
-            # result = np.real(np.min(values)) / np.real(np.max(values))
         result = torch.mean(torch.tensor(temp))
         return result
 
@@ -249,7 +234,6 @@ class GenCellV2(nn.Module):
         states = [data]
         edge_index = 0
         self._steps = steps
-        # count = 0
         no_param_ops = ['max_pool_3x3', 'avg_pool_3x3', 'skip_connect']
 
         for i in range(self._steps):
@@ -259,7 +243,6 @@ class GenCellV2(nn.Module):
                 stride = 2 if self.reduction and j < 1 else 1
                 for op_name in self.primitives[edge_index]:
                     op = OPS[op_name](C, stride, True)
-                    # print(len(states))
                     map = op(states[j])
                     s = self.score(map)
                     maps.append(map)
@@ -267,7 +250,6 @@ class GenCellV2(nn.Module):
                     scores.append(s)
 
             comb_scores = list(itertools.combinations(scores, i + 1))
-            # print(len(comb_scores))
             sorted_id = sorted(range(len(comb_scores)), key=lambda k: sum(comb_scores[k]), reverse=True)
 
             for id in sorted_id:
@@ -327,25 +309,6 @@ class GenCellV2(nn.Module):
             self._ops += [op]
         self._indices = indices
 
-        '''
-        def forward(self, x, drop_prob):
-        outs = [x]
-        idx = 0
-        for curr_node in range(self.num_nodes - 1):
-            edges_in = []
-            for prev_node in range(curr_node + 1):  # n-1 prev nodes
-                op = self.options[idx]
-                id = self.indicate[idx]
-                map = op(outs[id])
-                # if self.training and drop_prob > 0.:
-                #     if not isinstance(op, Identity):
-                #         map = drop_path(map, drop_prob)
-                edges_in.append(map)
-                idx += 1
-            node_output = sum(edges_in)
-            outs.append(node_output)
-        return outs[-1]
-        '''
 
     def forward(self, s1, s2, drop_prob):
         s1 = self.preprocess0(s1)
@@ -474,7 +437,6 @@ class GenNetwork(nn.Module):
                            data1=s0, data2=s1, primitives=primitives)
             self.net_score += cell.get_cell_score()
             s0, s1 = s1, cell(s0, s1, 0)
-            # print(cell)
             reduction_prev = reduction
             self.cells += [cell]
             C_prev_prev, C_prev = C_prev, cell.multiplier * C_curr
@@ -539,9 +501,7 @@ class GenNetworkV2(nn.Module):
                              concat=concat,
                              data1=s0, data2=s1, primitives=primitives)
             self.net_score += cell.get_cell_score()
-            # s0, s1 = s1, cell(s0, s1, self.drop_path_prob)
             s0, s1 = s1, cell(s0, s1, 0)
-            # print(cell)
             reduction_prev = reduction
             self.cells += [cell]
             C_prev_prev, C_prev = C_prev, cell.multiplier * C_curr
@@ -565,7 +525,6 @@ class GenNetworkV2(nn.Module):
         s0 = s1 = self.stem(input)
         for i, cell in enumerate(self.cells):
             s0, s1 = s1, cell(s0, s1, self.drop_path_prob)
-            # print(self.drop_path_prob)
             if i == 2 * self._layers // 3:
                 if self._auxiliary and self.training:
                     logits_aux = self.auxiliary_head(s1)
