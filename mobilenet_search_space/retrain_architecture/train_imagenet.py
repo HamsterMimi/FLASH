@@ -41,7 +41,7 @@ parser.add_argument('--warmup', default=5, type=int)
 parser.add_argument('--report_freq', type=float, default=100, help='report frequency')
 parser.add_argument('--gpu', type=int, default=0, help='gpu device id')
 parser.add_argument('--label_smoothing', default=True, type=bool)
-parser.add_argument('--mixup', default=True, type=bool)
+parser.add_argument('--mixup', default=False, type=bool)
 parser.add_argument('--arch', default='gz_mobile_net', type=str)
 parser.add_argument('--epochs', type=int, default=480, help='num of training epochs')
 parser.add_argument('--nesterov', type=bool, default=True)
@@ -266,22 +266,11 @@ def main():
     transform_list = [transforms.Resize(256),
                       transforms.RandomResizedCrop(224, interpolation=PIL.Image.BICUBIC),
                       transforms.RandomHorizontalFlip(),
-                      autoaugment.ImageNetPolicy(),
+                      # autoaugment.ImageNetPolicy(),
                       transforms.ToTensor(),
                       Lighting(lighting_param, _IMAGENET_PCA['eigval'], _IMAGENET_PCA['eigvec']),
                       normalize,
                       hotfix.transforms.RandomErasing()]
-    # train_transform = transforms.Compose([
-    #     transforms.RandomResizedCrop(224),
-    #     transforms.RandomHorizontalFlip(),
-    #     transforms.ColorJitter(
-    #         brightness=0.4,
-    #         contrast=0.4,
-    #         saturation=0.4,
-    #         hue=0.2),
-    #     transforms.ToTensor(),
-    #     normalize,
-    # ])
     train_transform = transforms.Compose(transform_list)
 
     test_transform = transforms.Compose([
@@ -300,44 +289,8 @@ def main():
         valid_data, batch_size=args.batch_size, shuffle=False, pin_memory=True, num_workers=48)
     num_train_samples = 1281167
 
-    # networks_pool = '/jty/jty/zero-cost-pt/experiments/mobilenet-random-meco/networks_pool.json'
-
-    # pools= json.load(open(networks_pool, 'r'))
-    # networks_pool = [pools['networks'][_]['genotype'] for _ in range(pools['pool_size'])]
-    # best_score, best_arch = 0, None
-    # print(networks_pool)
-    # for net in networks_pool:
-    #     genotype_list = net.split(' ')
-    #     genotype_list = [int(_) for _ in genotype_list]
-    #     model = Network(genotype_list)
-    #
-    #     for m in model.modules():
-    #         if isinstance(m, nn.Conv2d):
-    #             nn.init.xavier_normal_(m.weight.data, gain=3.26033)
-    #             if hasattr(m, 'bias') and m.bias is not None:
-    #                 nn.init.zeros_(m.bias)
-    #         elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
-    #             nn.init.ones_(m.weight)
-    #             nn.init.zeros_(m.bias)
-    #         elif isinstance(m, nn.Linear):
-    #             nn.init.normal_(m.weight, 0, 3.26033 * np.sqrt(2 / (m.weight.shape[0] + m.weight.shape[1])))
-    #             if hasattr(m, 'bias') and m.bias is not None:
-    #                 nn.init.zeros_(m.bias)
-    #         else:
-    #             pass
-    #     score = get_score(model, train_queue, device='cuda:0', args=args, measure='meco')
-    #     print(score)
-    #     if score > best_score:
-    #         best_arch = net
-    #         best_score = score
-    # print(best_arch)
-    # exit()
 
     arch99 = [3, 3, 2, 2, 3, 5, 5, 4, 3, 2, 5, 4, 3, 5, 3, 5, 5, 5, 3, 2, 5]
-    arch100 = [5, 5, 3, 4, 3, 2, 5, 5, 3, 5, 3, 5, 5, 4, 5, 4, 3, 5, 2, 3, 1]
-    # genotype_list = arch.split(' ')
-    # genotype_list = [int(_) for _ in genotype_list]
-    # model = Network(genotype_list)
     model = Network(arch99)
 
 
@@ -375,13 +328,9 @@ def main():
     flops, params = profile(model, inputs=(input_data, ))
     print('FLOPs = ' + str(flops / 1000 ** 2) + 'M')
     print('Params = ' + str(params / 1000 ** 2) + 'M')
-    # exit()
     if args.parallel:
         model = nn.DataParallel(model.cuda())
-    # print(type(model))
-    # for m in model.modules():
-    # print(type(m))
-    # exit()
+
 
     # define loss function (criterion)
     if (hasattr(args, 'label_smoothing') and args.label_smoothing) or (hasattr(args, 'mixup') and args.mixup):
@@ -456,7 +405,6 @@ def train(train_queue, model, criterion, optimizer, epoch, num_train_samples=Non
         lr_scheduler.update_lr(batch_size=input.shape[0])
 
         current_lr = lr_scheduler.get_lr()
-        # logging.info('current_lr:, %f ' % current_lr[0])
         for param_group in optimizer.param_groups:
             param_group['lr'] = current_lr
 

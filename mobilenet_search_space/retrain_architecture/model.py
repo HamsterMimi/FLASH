@@ -217,7 +217,6 @@ class GzNetwork(nn.Module):
                             max_score = score
                             best_op_idx = op_idx
                             best_op = op
-                # print(best_op_idx)
                 self.rng.append(best_op_idx)
                 self.features.append(best_op)
                 self.x = self.x if best_op is None else best_op(self.x)
