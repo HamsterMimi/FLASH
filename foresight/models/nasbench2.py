@@ -124,10 +124,6 @@ class NAS201Model(nn.Module):
 class GenModel(nn.Module):
 
     def __init__(self, data, num_classes, use_bn=True, stem_ch=16, arch=None):
-        '''
-        version: 1. 每层都不一样，逐层生成，每个cell都不重复
-                 2. 三种不同的cell，分别在三个阶段重复
-        '''
         super(GenModel, self).__init__()
         self.num_classes = num_classes
         self.use_bn = use_bn
@@ -216,10 +212,6 @@ class GenModel(nn.Module):
 class GenModelV2(nn.Module):
 
     def __init__(self, data, num_classes, use_bn=True, stem_ch=16, arch=None):
-        '''
-        version: 1. 每层都不一样，逐层生成，每个阶段的cell重复
-                 2. 三种不同的cell，分别在三个阶段重复
-        '''
         super(GenModelV2, self).__init__()
         self.num_classes = num_classes
         self.use_bn = use_bn

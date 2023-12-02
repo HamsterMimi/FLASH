@@ -112,7 +112,6 @@ class stem(nn.Module):
         return self.net(x)
 
 class top(nn.Module):
-    # def __init__(self, in_dims, num_classes, use_bn=True):
     def __init__(self, in_dims, use_bn=True):
         super(top, self).__init__()
         if use_bn:
@@ -120,14 +119,11 @@ class top(nn.Module):
         else:
             self.lastact = nn.ReLU(inplace=True)
         self.global_pooling = nn.AdaptiveAvgPool2d(1)
-        # self.classifier = nn.Linear(in_dims, num_classes)
 
     def forward(self, x):
         x = self.lastact(x)
         x = self.global_pooling(x)
         x = x.view(x.size(0), -1)
-        # logits = self.classifier(x)
-        # return logits
         return x
 
 
@@ -152,15 +148,12 @@ class SearchCell(nn.Module):
         outs = [x]
 
         idx = 0
-        # print(self.keep_mask)
         for curr_node in range(self.num_nodes-1):
             edges_in = []
             for prev_node in range(curr_node+1): # n-1 prev nodes
                 for op_idx in range(len(OPS.keys())):
                     if self.keep_mask[idx]:
-                        # print(list(OPS.keys())[op_idx])
                         edges_in.append(self.options[idx](outs[prev_node]))
-                        # print(f'({op_idx}, {idx}),({prev_node}, {curr_node + 1})', self.options[idx].name)
                     idx += 1
             node_output = sum(edges_in)
             outs.append(node_output)
@@ -184,7 +177,6 @@ class GenCell(nn.Module):
             self.arch = arch
 
             for op_name in arch:
-                # e.g. ['nor_conv_3x3', 'nor_conv_3x3', 'nor_conv_3x3', 'skip_connect', 'nor_conv_3x3', 'nor_conv_1x1']
                 self.options.append(OPS[op_name[0]](in_channels, out_channels, stride, affine, track_running_stats, use_bn))
                 self.indicate.append(op_name[1])
 
@@ -208,43 +200,11 @@ class GenCell(nn.Module):
                     maps.append(map)
                     ops.append((op, prev_node, _op_name))
 
-            # sorted_id = sorted(range(len(scores)), key=lambda k: scores[k], reverse=True)
             no_param_ops = ['avg_pool_3x3', 'skip_connect', 'none']
 
             comb_scores = list(itertools.combinations(scores, curr_node + 1))
-            # comb_maps = list(itertools.combinations(maps, curr_node + 1))
             sorted_id = sorted(range(len(comb_scores)), key=lambda k: sum(comb_scores[k]), reverse=True)
-            # sorted_map = sorted(range(len(comb_scores)), key=lambda k: self.meco(sum(comb_maps[k])), reverse=True)
-            # print(sorted_map)
-            # for id in sorted_id:
-            #     print(comb_scores[id], sum(comb_scores[id]))
-            # for id in sorted_map:
-            #     ops_id = [self._index(maps, comb_maps[id][_]) for _ in range(curr_node + 1)]
-            #     # print(ops_id)
-            #     prev_node_id = [ops[_][1] for _ in ops_id]
-            #     if len(set(prev_node_id)) == len(prev_node_id):
-            #         # print(prev_node_id)
-            #         opnames = [ops[_][2] for _ in ops_id]
-            #         c = sum([_ in no_param_ops for _ in opnames])
-            #         # print(opnames, c)
-            #         if c < 2:
-            #             ops = [ops[_] for _ in ops_id]
-            #             edges_in = [maps[_] for _ in ops_id]
-            #             count += c
-            #             # print([(_[2],_[1]) for _ in ops], count)
-            #             break
-            #         else:
-            #             continue
-            #     else:
-            #         continue
-            # out = sum(edges_in)
-            # self.cell_score += self.meco(out)
-            # outs.append(out)
-            # for o in ops:
-            #     self.options.append(o[0])
-            #     self.indicate.append(o[1])
-            #     self.arch.append((o[2], o[1]))
-        # print(self.cell_score)
+
 
             for id in sorted_id:
                 ops_id = [scores.index(comb_scores[id][_]) for _ in range(curr_node + 1)]
@@ -259,7 +219,6 @@ class GenCell(nn.Module):
                         edges_in = [maps[_] for _ in ops_id]
                         self.cell_score += sum(comb_scores[id]).item()
                         count += c
-                        # print([(_[2],_[1]) for _ in ops], count)
                         break
                     else:
                         continue
@@ -271,11 +230,7 @@ class GenCell(nn.Module):
                 self.options.append(o[0])
                 self.indicate.append(o[1])
                 self.arch.append((o[2], o[1]))
-            # print(self.arch)
-            #
-            # print(len(self.options))
-            # print(self.options)
-            # print([(o[2], o[1]) for o in ops])
+
 
 
     def forward(self, x, drop_prob):
