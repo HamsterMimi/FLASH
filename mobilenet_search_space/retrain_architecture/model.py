@@ -178,7 +178,7 @@ class GzNetwork(nn.Module):
         self.conv_bn = conv_bn(3, input_channel, 2)
         self.MBConv_ratio_1 = InvertedResidual(input_channel, int(24*width_mult), 3, 1, 1, 1)
         input_channel = int(24*width_mult)
-        self.features = [] # 最终操作
+        self.features = []
         self.score = 0
         self.rng = []
         num = 0

@@ -25,7 +25,6 @@ import torch.nn as nn
 import torch.utils
 import torchvision.transforms as transforms
 import nasbench201.utils as utils
-import autoaugment
 import torch.nn.functional as F
 
 
@@ -290,8 +289,8 @@ def main():
     num_train_samples = 1281167
 
 
-    arch99 = [3, 3, 2, 2, 3, 5, 5, 4, 3, 2, 5, 4, 3, 5, 3, 5, 5, 5, 3, 2, 5]
-    model = Network(arch99)
+    arch = [3, 3, 2, 2, 3, 5, 5, 4, 3, 2, 5, 4, 3, 5, 3, 5, 5, 5, 3, 2, 5]
+    model = Network(arch)
 
 
     for m in model.modules():

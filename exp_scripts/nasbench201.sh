@@ -1,3 +1,3 @@
 cd ..
 
-python nasbench_tss_layernas.py
+python nasbench_tss.py

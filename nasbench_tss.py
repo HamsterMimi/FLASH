@@ -48,9 +48,9 @@ def query(api, genotype):
     result = api.query_by_arch(genotype, hp='200')
     cifar10_train, cifar10_test, cifar100_train, cifar100_valid, \
         cifar100_test, imagenet16_train, imagenet16_valid, imagenet16_test = distill(result)
-    logging.info('cifar10 train %f test %f', cifar10_train, cifar10_test)
-    logging.info('cifar100 train %f valid %f test %f', cifar100_train, cifar100_valid, cifar100_test)
-    logging.info('imagenet16 train %f valid %f test %f', imagenet16_train, imagenet16_valid, imagenet16_test)
+    print(f'cifar10 train {cifar10_train} test {cifar10_test}')
+    print(f'cifar100 train {cifar100_train} valid {cifar100_valid} test {cifar100_test}')
+    print(f'imagenet16 train {imagenet16_train} valid {imagenet16_valid} test {imagenet16_test}')
     return cifar10_train, cifar10_test, cifar100_train, cifar100_valid, \
         cifar100_test, imagenet16_train, imagenet16_valid, imagenet16_test
 
@@ -159,4 +159,4 @@ if __name__ == '__main__':
     best_arch = tostr(net.get_arch())
     print('best arch: ', best_arch)
     api = create(None, args.search_space, fast_mode=True, verbose=False)
-    print(query(api, best_arch))
+    query(api, best_arch)
