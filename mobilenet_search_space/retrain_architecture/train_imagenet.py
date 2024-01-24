@@ -289,17 +289,16 @@ def main():
         valid_data, batch_size=args.batch_size, shuffle=False, pin_memory=True, num_workers=48)
     num_train_samples = 1281167
 
-    best_arch, best_score = None, 0
-    for _ in tqdm(range(10)):
-        network = GzNetwork()
-        score = network.get_score()
-        if score > best_score:
-            best_score = score
-            best_arch = network.arch()
-
-    print(best_arch)
-
-    arch = best_arch
+    # best_arch, best_score = None, 0
+    # for _ in tqdm(range(10)):
+    #     network = GzNetwork()
+    #     score = network.get_score()
+    #     if score > best_score:
+    #         best_score = score
+    #         best_arch = network.arch()
+    #
+    # print(best_arch)
+    arch = [3, 3, 2, 2, 3, 5, 5, 4, 3, 2, 5, 4, 3, 5, 3, 5, 5, 5, 3, 2, 5]
     model = Network(arch)
 
 
