@@ -29,6 +29,7 @@ parser.add_argument('--data', type=str, default='../../_dataset',
                     help='location of the data corpus')
 parser.add_argument('--dataset', type=str, default='cifar10', help='choose dataset')
 parser.add_argument('--model_name', default=None, type=str)
+parser.add_argument('--measure', default='meco', choices=['meco', 'param', 'flops'])
 parser.add_argument('--pool', type=int, default=10)
 parser.add_argument('--batch_size', type=int, default=96, help='batch size')
 parser.add_argument('--learning_rate', type=float, default=0.025, help='init learning rate')
@@ -181,7 +182,7 @@ def main():
             arch = None
             model = GenNetwork(arch, args.init_channels, n_classes, args.layers, args.auxiliary, steps=args.steps,
                             concat=range(2, 6), data=x,
-                            primitives=spaces_dict[args.search_space], drop_path_prob=args.drop_path_prob)
+                            primitives=spaces_dict[args.search_space], drop_path_prob=args.drop_path_prob, measure=args.measure)
 
             models_pool.append((model, model.get_net_score()))
         e = time.time()
@@ -198,7 +199,7 @@ def main():
                            )
     logging.info("param size = %fMB", ig_utils.count_parameters_in_MB(model))
     model = model.cuda()
-    model = nn.DataParallel(model)
+    # model = nn.DataParallel(model)
 
 
     criterion = nn.CrossEntropyLoss()

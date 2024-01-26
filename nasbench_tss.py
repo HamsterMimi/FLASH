@@ -21,6 +21,7 @@ import torch.optim as optim
 from nats_bench import create
 from tqdm import tqdm
 
+
 from foresight.dataset import *
 from foresight.models import nasbench2
 
@@ -88,6 +89,7 @@ def parse_arguments():
     parser.add_argument('--search_space', default='tss', type=str)
     parser.add_argument('--api_loc', default='data/NAS-Bench-201-v1_1-096897.pth',
                         type=str, help='path to API')
+    parser.add_argument('--measure', default='meco', type=str, choices=['meco', 'param', 'flops'])
     parser.add_argument('--learning_rate', default=0.025, type=float)
     parser.add_argument('--momentum', default=0.9, type=float)
     parser.add_argument('--weight_decay', default=5e-4, type=float)
@@ -115,7 +117,6 @@ def parse_arguments():
                         help='dataset to use [cifar10, cifar100, ImageNet16-120]')
     parser.add_argument('--gpu', type=int, default=0, help='GPU index to work on')
     parser.add_argument('--num_data_workers', type=int, default=2, help='number of workers for dataloaders')
-    parser.add_argument('--measure', type=str, default='meco')
     parser.add_argument('--dataload', type=str, default='random', help='random or grasp supported')
     parser.add_argument('--dataload_info', type=int, default=1,
                         help='number of batches to use for random dataload or number of samples per class for grasp dataload')
@@ -149,7 +150,7 @@ if __name__ == '__main__':
         arch = None
         net = nasbench2.gen_model(data=x, num_classes=get_num_classes(args),
                                   version=args.version, arch=arch,
-                                  init_channels=args.init_channels)
+                                  init_channels=args.init_channels, measure=args.measure)
         pool.append((net, net.get_net_score()))
     nets_id = sorted(range(len(pool)), key=lambda k: pool[k][1], reverse=True)
     scores = [_[1] for _ in pool]

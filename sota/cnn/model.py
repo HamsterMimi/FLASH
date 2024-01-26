@@ -2,6 +2,8 @@ import itertools
 import random
 import sys
 
+from thop import profile
+
 from sota.cnn.operations import *
 
 sys.path.insert(0, '../../')
@@ -64,12 +66,13 @@ class Cell(nn.Module):
 class GenCell(nn.Module):
 
     def __init__(self, arch, C_prev_prev, C_prev, C, reduction, reduction_prev, steps=None, concat=None, data1=None,
-                 data2=None, primitives=None):
+                 data2=None, primitives=None, measure='meco'):
         super(GenCell, self).__init__()
         self.reduction = reduction
         self.primitives = primitives['primitives_reduct' if reduction else 'primitives_normal']
         self.multiplier = len(concat)
         self.cell_score = 0
+        self.measure = measure
         if reduction_prev:
             self.preprocess0 = FactorizedReduce(C_prev_prev, C)
         else:
@@ -108,13 +111,17 @@ class GenCell(nn.Module):
                     op = OPS[op_name](C, stride, True)
                     # print(len(states))
                     map = op(states[j])
-                    s = self.score(map)
+                    s = self.score(map, op, self.measure, input_data=torch.randn_like(states[j]))
+                    temp = 0 if self.measure=='meco' else j
+                    s += temp
                     maps.append(map)
                     ops.append((op, j, op_name))
                     scores.append(s)
 
             comb_scores = list(itertools.combinations(scores, 2))
             sorted_id = sorted(range(len(comb_scores)), key=lambda k: sum(comb_scores[k]), reverse=True)
+
+
 
             for id in sorted_id:
                 ops_id = [scores.index(comb_scores[id][k]) for k in range(2)]
@@ -141,21 +148,29 @@ class GenCell(nn.Module):
         self._ops, self._indices, self._ops_name = zip(*self._ops)
         self._ops = nn.ModuleList(self._ops)
 
-
-    def score(self, x):
-        x = x[0]
-        out_channels = x.size()[0]
-        fea = x.reshape(out_channels, -1)
-        temp = []
-        for i in range(int(out_channels/8)):
-            idxs = random.sample(range(out_channels), 8)
-            corr = torch.corrcoef(fea[idxs, :])
-            corr[torch.isnan(corr)] = 0
-            corr[torch.isinf(corr)] = 0
-            values = torch.linalg.eig(corr)[0]
-            temp.append(torch.min(torch.real(values)))
-        result = torch.mean(torch.tensor(temp))
-        return result
+    def score(self, x, op=None, measure='meco', input_data=None):
+        if measure == 'meco':
+            x = x[0]
+            out_channels = x.size()[0]
+            fea = x.reshape(out_channels, -1)
+            temp = []
+            for i in range(int(out_channels / 8)):
+                idxs = random.sample(range(out_channels), 8)
+                corr = torch.corrcoef(fea[idxs, :])
+                corr[torch.isnan(corr)] = 0
+                corr[torch.isinf(corr)] = 0
+                values = torch.linalg.eig(corr)[0]
+                temp.append(torch.min(torch.real(values)))
+            result = torch.mean(torch.tensor(temp))
+            return result
+        elif measure == 'param' or measure == 'flops':
+            flops, params = profile(op, inputs=(input_data,), verbose=False)
+            if measure == 'param':
+                return params
+            elif measure == 'flops':
+                return flops
+        else:
+            raise NotImplementedError('Unknown measure')
 
     def get_arch(self):
         return self.arch
@@ -407,12 +422,13 @@ class Network(nn.Module):
 
 class GenNetwork(nn.Module):
 
-    def __init__(self, arch, C, num_classes, layers, auxiliary, steps, concat, data, primitives, drop_path_prob):
+    def __init__(self, arch, C, num_classes, layers, auxiliary, steps, concat, data, primitives, drop_path_prob, measure='meco'):
         super(GenNetwork, self).__init__()
         self._layers = layers
         self._auxiliary = auxiliary
         self.drop_path_prob = drop_path_prob
         self.net_score = 0
+        self.measure = measure
         if arch is None:
             arch = [None] * layers
 
@@ -434,7 +450,7 @@ class GenNetwork(nn.Module):
             else:
                 reduction = False
             cell = GenCell(arch[i], C_prev_prev, C_prev, C_curr, reduction, reduction_prev, steps=steps, concat=concat,
-                           data1=s0, data2=s1, primitives=primitives)
+                           data1=s0, data2=s1, primitives=primitives, measure=self.measure)
             self.net_score += cell.get_cell_score()
             s0, s1 = s1, cell(s0, s1, 0)
             reduction_prev = reduction

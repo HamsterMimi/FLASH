@@ -1,16 +1,13 @@
 import argparse
 import glob
-import json
 import logging
 import sys
 
 import PIL
 import torchvision
-from torch.utils.tensorboard import SummaryWriter
-import PIL
 from thop import profile
+from torch.utils.tensorboard import SummaryWriter
 
-# from genotypes import Genotype
 import hotfix
 from model import Network
 
@@ -26,8 +23,6 @@ import torch.utils
 import torchvision.transforms as transforms
 import nasbench201.utils as utils
 import torch.nn.functional as F
-from model import GzNetwork
-from tqdm import tqdm
 
 parser = argparse.ArgumentParser("imagenet")
 parser.add_argument('--data', type=str, default='/dev/ImageNet-1K', help='location of the data corpus')

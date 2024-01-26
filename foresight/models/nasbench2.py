@@ -42,11 +42,11 @@ def get_model_from_arch_str(arch_str, num_classes, use_bn=True, init_channels=16
 
 
 
-def gen_model(data, num_classes, use_bn=True, init_channels=16, arch=None, version=1):
+def gen_model(data, num_classes, use_bn=True, init_channels=16, arch=None, version=1, measure='meco'):
     if version==1:
         net = GenModel(data, num_classes=num_classes, use_bn=use_bn, stem_ch=init_channels, arch=arch)
     elif version==2:
-        net = GenModelV2(data, num_classes=num_classes, use_bn=use_bn, stem_ch=init_channels, arch=arch)
+        net = GenModelV2(data, num_classes=num_classes, use_bn=use_bn, stem_ch=init_channels, arch=arch, measure=measure)
     else:
         net = None
     return net
@@ -211,7 +211,7 @@ class GenModel(nn.Module):
 
 class GenModelV2(nn.Module):
 
-    def __init__(self, data, num_classes, use_bn=True, stem_ch=16, arch=None):
+    def __init__(self, data, num_classes, use_bn=True, stem_ch=16, arch=None, measure='meco'):
         super(GenModelV2, self).__init__()
         self.num_classes = num_classes
         self.use_bn = use_bn
@@ -229,7 +229,7 @@ class GenModelV2(nn.Module):
         # print(self.arch)
         for _ in range(self.N):
             curr_cell = GenCell(data, in_channels=stem_ch, out_channels=stem_ch, stride=1, affine=False,
-                                track_running_stats=False, use_bn=use_bn, arch=self.arch)
+                                track_running_stats=False, use_bn=use_bn, arch=self.arch, measure=measure)
             self.stack_cell1.append(curr_cell)
         self.reduction1 = reduction(in_channels=stem_ch, out_channels=stem_ch * 2)
         data = self.reduction1(data)

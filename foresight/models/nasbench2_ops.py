@@ -21,6 +21,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import itertools
+
+from thop import profile
+
 from nasbench201.utils import drop_path
 
 
@@ -162,12 +165,13 @@ class SearchCell(nn.Module):
 
 class GenCell(nn.Module):
 
-    def __init__(self, data, in_channels, out_channels, stride, affine, track_running_stats, use_bn=True, num_nodes=4, arch=None):
+    def __init__(self, data, in_channels, out_channels, stride, affine, track_running_stats, measure='meco', use_bn=True, num_nodes=4, arch=None):
         super(GenCell, self).__init__()
         self.num_nodes = num_nodes
         self.options = nn.ModuleList()
         self.indicate = []
         self.cell_score = 0
+        self.measure = measure
 
         if arch == None:
             self.arch = []
@@ -179,6 +183,7 @@ class GenCell(nn.Module):
             for op_name in arch:
                 self.options.append(OPS[op_name[0]](in_channels, out_channels, stride, affine, track_running_stats, use_bn))
                 self.indicate.append(op_name[1])
+
 
 
 
@@ -195,7 +200,7 @@ class GenCell(nn.Module):
                     op = OPS[_op_name](in_channels, out_channels, stride, affine, track_running_stats, use_bn)
                     # print(_op_name, outs[prev_node].size())
                     map = op(outs[prev_node])
-                    meco = self.meco(map)
+                    meco = self.score(map, op, measure=self.measure)
                     scores.append(meco)
                     maps.append(map)
                     ops.append((op, prev_node, _op_name))
@@ -262,35 +267,34 @@ class GenCell(nn.Module):
     def get_cell_score(self):
         return self.cell_score
 
-    def meco(self, x):
-        x = x[0]
-        out_channels = x.size()[0]
-        fea = x.reshape(out_channels, -1)
-        temp = []
-        for i in range(int(out_channels/8)):
-            idxs = random.sample(range(out_channels), 8)
-            corr = torch.corrcoef(fea[idxs, :])
-            corr[torch.isnan(corr)] = 0
-            corr[torch.isinf(corr)] = 0
-            values = torch.linalg.eig(corr)[0]
-            temp.append(torch.min(torch.real(values)))
-        result = torch.mean(torch.tensor(temp))
-        return result
+    def score(self, x, op=None, measure='meco'):
+        if measure == 'meco':
+            x = x[0]
+            out_channels = x.size()[0]
+            fea = x.reshape(out_channels, -1)
+            temp = []
+            for i in range(int(out_channels / 8)):
+                idxs = random.sample(range(out_channels), 8)
+                corr = torch.corrcoef(fea[idxs, :])
+                corr[torch.isnan(corr)] = 0
+                corr[torch.isinf(corr)] = 0
+                values = torch.linalg.eig(corr)[0]
+                temp.append(torch.min(torch.real(values)))
+            result = torch.mean(torch.tensor(temp))
+            return result
+        elif measure == 'param' or measure == 'flops':
+            input_data = torch.randn(size=(1,3,32,32))
+            flops, params = profile(op, inputs=(input_data,))
+            if measure == 'param':
+                return params
+            elif measure == 'flops':
+                return flops
+        else:
+            raise NotImplementedError('Unknown measure')
 
-    def deco(self, x, out_channels):
-        x = x[0]
-        fea = x.reshape(out_channels, -1)
-        temp = []
-        for i in range(8):
-            idxs = random.sample(range(out_channels), 8)
-            corr = torch.corrcoef(fea[idxs, :])
-            corr[torch.isnan(corr)] = 0
-            corr[torch.isinf(corr)] = 0
-            values = torch.linalg.eig(corr)[0]
-            temp.append(torch.min(torch.real(values))/torch.max(torch.real(values)))
-            # result = np.real(np.min(values)) / np.real(np.max(values))
-        result = torch.mean(torch.tensor(temp))
-        return result
+
+
+
 
 
 OPS = {
