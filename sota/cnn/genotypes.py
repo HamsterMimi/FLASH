@@ -538,3 +538,4 @@ TE_NAS = Genotype(
             ('sep_conv_3x3', 3), ('dil_conv_3x3', 1), ('sep_conv_5x5', 2)], normal_concat=[2, 3, 4, 5],
     reduce=[('dil_conv_5x5', 0), ('sep_conv_5x5', 1), ('dil_conv_3x3', 1), ('dil_conv_5x5', 2), ('dil_conv_3x3', 2),
             ('sep_conv_5x5', 3), ('sep_conv_5x5', 0), ('max_pool_3x3', 4)], reduce_concat=[2, 3, 4, 5])
+

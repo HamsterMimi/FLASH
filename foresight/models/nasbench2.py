@@ -221,7 +221,7 @@ class GenModelV2(nn.Module):
         data = self.stem(data)
         self.stack_cell1 = nn.ModuleList([])
         cell = GenCell(data, in_channels=stem_ch, out_channels=stem_ch, stride=1, affine=False,
-                                track_running_stats=False, use_bn=use_bn, arch=arch)
+                                track_running_stats=False, use_bn=use_bn, arch=arch, measure=measure)
         self.arch = cell.get_arch()
         self.net_score += cell.get_cell_score() * self.N * 3
 

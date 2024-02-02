@@ -200,7 +200,7 @@ class GenCell(nn.Module):
                     op = OPS[_op_name](in_channels, out_channels, stride, affine, track_running_stats, use_bn)
                     # print(_op_name, outs[prev_node].size())
                     map = op(outs[prev_node])
-                    meco = self.score(map, op, measure=self.measure)
+                    meco = self.score(map, op, measure=self.measure, map=outs[prev_node])
                     scores.append(meco)
                     maps.append(map)
                     ops.append((op, prev_node, _op_name))
@@ -267,7 +267,7 @@ class GenCell(nn.Module):
     def get_cell_score(self):
         return self.cell_score
 
-    def score(self, x, op=None, measure='meco'):
+    def score(self, x, op=None, measure='meco', map=None):
         if measure == 'meco':
             x = x[0]
             out_channels = x.size()[0]
@@ -283,12 +283,37 @@ class GenCell(nn.Module):
             result = torch.mean(torch.tensor(temp))
             return result
         elif measure == 'param' or measure == 'flops':
-            input_data = torch.randn(size=(1,3,32,32))
+            input_data = map
             flops, params = profile(op, inputs=(input_data,))
             if measure == 'param':
                 return params
             elif measure == 'flops':
                 return flops
+        elif measure == 'zen':
+            input = map
+            input2 = torch.randn_like(map)
+            mixup_input = input + 1e-2 * input2
+            output = op(input)
+            mixup_output = op(mixup_input)
+            nas_score = torch.sum(torch.abs(output - mixup_output), dim=[1, 2, 3])
+            nas_score = torch.mean(nas_score)
+            log_bn_scaling_factor = 0.0
+            for m in op.modules():
+                if isinstance(m, nn.BatchNorm2d):
+                    try:
+                        bn_scaling_factor = torch.sqrt(torch.mean(m.running_var))
+                        log_bn_scaling_factor += torch.log(bn_scaling_factor)
+                    except:
+                        pass
+                pass
+            pass
+            nas_score = torch.log(nas_score) + log_bn_scaling_factor
+            return nas_score
+
+
+
+
+
         else:
             raise NotImplementedError('Unknown measure')
 

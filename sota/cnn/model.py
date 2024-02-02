@@ -111,9 +111,12 @@ class GenCell(nn.Module):
                     op = OPS[op_name](C, stride, True)
                     # print(len(states))
                     map = op(states[j])
-                    s = self.score(map, op, self.measure, input_data=torch.randn_like(states[j]))
-                    temp = 0 if self.measure=='meco' else j
-                    s += temp
+                    s = self.score(map, op, self.measure, input_data=states[j])
+                    if (self.measure == 'param' or self.measure == 'flops'):
+                        t = j
+                    else:
+                        t = 0
+                    s += t
                     maps.append(map)
                     ops.append((op, j, op_name))
                     scores.append(s)
@@ -169,6 +172,26 @@ class GenCell(nn.Module):
                 return params
             elif measure == 'flops':
                 return flops
+        elif measure == 'zen':
+            input = input_data
+            input2 = torch.randn_like(input_data)
+            mixup_input = input + 1e-2 * input2
+            output = op(input)
+            mixup_output = op(mixup_input)
+            nas_score = torch.sum(torch.abs(output - mixup_output), dim=[1, 2, 3])
+            nas_score = torch.mean(nas_score)
+            log_bn_scaling_factor = 0.0
+            for m in op.modules():
+                if isinstance(m, nn.BatchNorm2d):
+                    try:
+                        bn_scaling_factor = torch.sqrt(torch.mean(m.running_var))
+                        log_bn_scaling_factor += torch.log(bn_scaling_factor)
+                    except:
+                        pass
+                pass
+            pass
+            nas_score = torch.log(nas_score) + log_bn_scaling_factor
+            return nas_score
         else:
             raise NotImplementedError('Unknown measure')
 

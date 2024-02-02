@@ -15,10 +15,12 @@
 
 import argparse
 import time
+import random
 
 import torch
 import torch.optim as optim
 from nats_bench import create
+from torch.backends import cudnn
 from tqdm import tqdm
 
 
@@ -83,13 +85,20 @@ def setup_experiment(net, args):
 
     return optimiser, lr_scheduler, train_loader, val_loader
 
-
+def seed_torch(seed=0):
+    random.seed(seed)
+    np.random.seed(seed)
+    os.environ['PYTHONHASHSEED'] = str(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    cudnn.deterministic = True
+    cudnn.benchmark = False
 def parse_arguments():
     parser = argparse.ArgumentParser(description='EcoNAS Training Pipeline for NAS-Bench-201')
     parser.add_argument('--search_space', default='tss', type=str)
     parser.add_argument('--api_loc', default='data/NAS-Bench-201-v1_1-096897.pth',
                         type=str, help='path to API')
-    parser.add_argument('--measure', default='meco', type=str, choices=['meco', 'param', 'flops'])
+    parser.add_argument('--measure', default='meco', type=str, choices=['meco', 'param', 'flops', 'zen'])
     parser.add_argument('--learning_rate', default=0.025, type=float)
     parser.add_argument('--momentum', default=0.9, type=float)
     parser.add_argument('--weight_decay', default=5e-4, type=float)
@@ -132,8 +141,10 @@ def parse_arguments():
 if __name__ == '__main__':
     args = parse_arguments()
     print(args.device)
+    seed_torch(args.seed)
 
-    torch.manual_seed(args.seed)
+
+
 
     pre = 'cf' if 'cifar' in args.dataset else 'im'
     op = f"{args.search_space}_{pre}{get_num_classes(args)}"
@@ -142,7 +153,6 @@ if __name__ == '__main__':
     train_loader, val_loader = get_cifar_dataloaders(args.batch_size, args.batch_size, args.dataset,
                                                      args.num_data_workers, resize=32, auto_augment=args.autoaugment,
                                                      random_erase=args.erase, cutout=-1)
-
     x = next(iter(train_loader))[0][0].unsqueeze(0)
     pool = []
     start = time.time()
@@ -161,3 +171,5 @@ if __name__ == '__main__':
     print('best arch: ', best_arch)
     api = create(None, args.search_space, fast_mode=True, verbose=False)
     query(api, best_arch)
+    print('time: ', end - start)
+    print(f'mean score: {np.mean(scores)}, max score: {np.max(scores)}, std score: {np.std(scores)}')

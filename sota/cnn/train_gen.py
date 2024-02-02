@@ -29,7 +29,7 @@ parser.add_argument('--data', type=str, default='../../_dataset',
                     help='location of the data corpus')
 parser.add_argument('--dataset', type=str, default='cifar10', help='choose dataset')
 parser.add_argument('--model_name', default=None, type=str)
-parser.add_argument('--measure', default='meco', choices=['meco', 'param', 'flops'])
+parser.add_argument('--measure', default='meco', choices=['meco', 'param', 'flops', 'zen'])
 parser.add_argument('--pool', type=int, default=10)
 parser.add_argument('--batch_size', type=int, default=96, help='batch size')
 parser.add_argument('--learning_rate', type=float, default=0.025, help='init learning rate')
@@ -190,8 +190,13 @@ def main():
 
         models_id = sorted(range(len(models_pool)), key=lambda k: models_pool[k][1], reverse=True)
         model, idx = models_pool[models_id[0]][0], models_id[0]
-        print(model.get_arch())
         best_model=model.get_arch()
+        logging.info(f"model architecture: {best_model}")
+        scores = [_[1] for _ in models_pool]
+        logging.info(f'mean score: {np.mean(scores)}, max score: {np.max(scores)}, std score: {np.std(scores)}')
+        exit()
+
+
 
     model = GenNetwork(best_model, args.init_channels, n_classes, args.layers, args.auxiliary, steps=4,
                            concat=range(2, 6), data=torch.randn(size=(1, 3, 32, 32)),
