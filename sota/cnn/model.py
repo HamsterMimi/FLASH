@@ -4,7 +4,7 @@ import sys
 
 from thop import profile
 
-from sota.cnn.operations import *
+from operations import *
 
 sys.path.insert(0, '../../')
 from nasbench201.utils import drop_path
@@ -100,7 +100,7 @@ class GenCell(nn.Module):
         edge_index = 0
         self._steps = steps
         count = 0
-        no_param_ops = ['max_pool_3x3', 'avg_pool_3x3', 'skip_connect']
+        no_param_ops = ['max_pool_3x3', 'avg_pool_3x3', 'skip_connect', 'none', 'noise']
 
         for i in range(self._steps):
             edges_in = []
@@ -110,6 +110,7 @@ class GenCell(nn.Module):
                 for op_name in self.primitives[edge_index]:
                     op = OPS[op_name](C, stride, True)
                     # print(len(states))
+                    # print(op_name, states[j])
                     map = op(states[j])
                     s = self.score(map, op, self.measure, input_data=states[j])
                     if (self.measure == 'param' or self.measure == 'flops'):
@@ -133,6 +134,7 @@ class GenCell(nn.Module):
                     opnames = [ops[k][2] for k in ops_id]
                     c = sum([_ in no_param_ops for _ in opnames])
                     if (c < 2 and count + c < 3):
+                    # if c<2:
                         ops = [ops[_] for _ in ops_id]
                         edges_in = [maps[_] for _ in ops_id]
                         self.cell_score += sum(comb_scores[id])
@@ -142,6 +144,7 @@ class GenCell(nn.Module):
                         continue
                 else:
                     continue
+
             out = sum(edges_in)
             self._ops += ops
             edge_index += 1
@@ -163,7 +166,7 @@ class GenCell(nn.Module):
                 corr[torch.isnan(corr)] = 0
                 corr[torch.isinf(corr)] = 0
                 values = torch.linalg.eig(corr)[0]
-                temp.append(torch.min(torch.real(values)))
+                temp.append(torch.min(torch.real(values)) * out_channels/8)
             result = torch.mean(torch.tensor(temp))
             return result
         elif measure == 'param' or measure == 'flops':
@@ -445,7 +448,7 @@ class Network(nn.Module):
 
 class GenNetwork(nn.Module):
 
-    def __init__(self, arch, C, num_classes, layers, auxiliary, steps, concat, data, primitives, drop_path_prob, measure='meco'):
+    def __init__(self, arch, C, num_classes, layers, auxiliary, steps, concat, data, primitives, drop_path_prob, measure='meco', repeat=False):
         super(GenNetwork, self).__init__()
         self._layers = layers
         self._auxiliary = auxiliary
@@ -454,6 +457,9 @@ class GenNetwork(nn.Module):
         self.measure = measure
         if arch is None:
             arch = [None] * layers
+        self.repeat = repeat
+        self.normal_arch = None
+        self.reduction_arch = None
 
         stem_multiplier = 3
         C_curr = stem_multiplier * C
@@ -472,8 +478,26 @@ class GenNetwork(nn.Module):
                 reduction = True
             else:
                 reduction = False
-            cell = GenCell(arch[i], C_prev_prev, C_prev, C_curr, reduction, reduction_prev, steps=steps, concat=concat,
-                           data1=s0, data2=s1, primitives=primitives, measure=self.measure)
+            if self.repeat and reduction and self.reduction_arch:
+                cell = GenCell(self.reduction_arch, C_prev_prev, C_prev, C_curr, reduction, reduction_prev, steps=steps,
+                               concat=concat,
+                               data1=s0, data2=s1, primitives=primitives, measure=self.measure)
+            elif self.repeat and not reduction and self.normal_arch:
+                cell = GenCell(self.normal_arch, C_prev_prev, C_prev, C_curr, reduction, reduction_prev, steps=steps,
+                               concat=concat,
+                               data1=s0, data2=s1, primitives=primitives, measure=self.measure)
+            else:
+                cell = GenCell(arch[i], C_prev_prev, C_prev, C_curr, reduction, reduction_prev, steps=steps,
+                               concat=concat,
+                               data1=s0, data2=s1, primitives=primitives, measure=self.measure)
+                if reduction and not self.reduction_arch:
+                    self.reduction_arch = cell.get_arch()
+                elif not reduction and not self.normal_arch:
+                    self.normal_arch = cell.get_arch()
+
+
+
+
             self.net_score += cell.get_cell_score()
             s0, s1 = s1, cell(s0, s1, 0)
             reduction_prev = reduction
@@ -506,6 +530,18 @@ class GenNetwork(nn.Module):
         out = self.global_pooling(s1)
         logits = self.classifier(out.view(out.size(0), -1))
         return logits, logits_aux
+
+    def forward_pre_GAP(self, input):
+        logits_aux = None
+        s0 = s1 = self.stem(input)
+        for i, cell in enumerate(self.cells):
+            s0, s1 = s1, cell(s0, s1, self.drop_path_prob)
+            # print(self.drop_path_prob)
+            if i == 2 * self._layers // 3:
+                if self._auxiliary and self.training:
+                    logits_aux = self.auxiliary_head(s1)
+        out = self.global_pooling(s1)
+        return out
 
 
 class GenNetworkV2(nn.Module):
